@@ -72,16 +72,30 @@ public class PDFGeneratorService {
                     int totalPages = reader.getNumberOfPages();
                     com.itextpdf.text.pdf.PdfContentByte canvas = stamper.getOverContent(totalPages);
 
+                    // Buscar la posición del nombre del secretario en el PDF
+                    TextPositionFinder finder = new TextPositionFinder(Constantes.WS_SIGN_NOMBRE_SECRETARIO_AD_HOC);
+                    com.itextpdf.text.pdf.parser.PdfReaderContentParser parser =
+                        new com.itextpdf.text.pdf.parser.PdfReaderContentParser(reader);
+                    parser.processContent(totalPages, finder);
+
                     // Crear la imagen y configurar su tamaño
                     com.itextpdf.text.Image firmaImage = com.itextpdf.text.Image.getInstance(firmaImageBytes);
                     firmaImage.scaleToFit(230f, 100f);
 
-                    // Calcular posición centrada en la página
-                    // Página Letter: 612 x 792 puntos
-                    // Centrar horizontalmente: (612 - 230) / 2 = 191
-                    // Posición vertical: aproximadamente 200 puntos desde abajo (ajustar según necesidad)
-                    float xPosition = (PageSize.LETTER.getWidth() - 230f) / 2;
-                    float yPosition = 200f; // Ajustar esta posición según donde quieras la firma
+                    // Calcular posición basándose en la ubicación del nombre del secretario
+                    float xPosition = (PageSize.LETTER.getWidth() - 230f) / 2; // Centrado horizontalmente
+                    float yPosition;
+
+                    if (finder.isFound()) {
+                        // Posicionar la firma justo arriba del nombre del secretario
+                        // Agregar un offset para el espacio entre la firma y el nombre
+                        yPosition = finder.getY() + 10f; // 10 puntos arriba del texto
+                        logger.info("Posición del nombre encontrada en Y=" + finder.getY() + ", firma se posicionará en Y=" + yPosition);
+                    } else {
+                        // Si no se encuentra el texto, usar posición por defecto
+                        yPosition = 200f;
+                        logger.warn("No se encontró el nombre del secretario en el PDF, usando posición por defecto");
+                    }
 
                     firmaImage.setAbsolutePosition(xPosition, yPosition);
                     canvas.addImage(firmaImage);
@@ -193,5 +207,60 @@ public class PDFGeneratorService {
         }
 
         Files.delete(Paths.get(fileNameTemp));*/
+    }
+
+    /**
+     * Clase auxiliar para encontrar la posición de un texto específico en el PDF.
+     * Implementa RenderListener para procesar el contenido del PDF y encontrar coordenadas.
+     */
+    private static class TextPositionFinder implements com.itextpdf.text.pdf.parser.RenderListener {
+        private String textToFind;
+        private float foundX = -1;
+        private float foundY = -1;
+        private boolean found = false;
+
+        public TextPositionFinder(String textToFind) {
+            this.textToFind = textToFind;
+        }
+
+        @Override
+        public void beginTextBlock() {
+            // No necesitamos implementar esto
+        }
+
+        @Override
+        public void endTextBlock() {
+            // No necesitamos implementar esto
+        }
+
+        @Override
+        public void renderImage(com.itextpdf.text.pdf.parser.ImageRenderInfo renderInfo) {
+            // No necesitamos procesar imágenes
+        }
+
+        @Override
+        public void renderText(com.itextpdf.text.pdf.parser.TextRenderInfo renderInfo) {
+            String text = renderInfo.getText();
+            if (text != null && text.contains(textToFind)) {
+                // Obtener la posición baseline del texto
+                com.itextpdf.text.pdf.parser.Vector baseline = renderInfo.getBaseline().getStartPoint();
+                foundX = baseline.get(com.itextpdf.text.pdf.parser.Vector.I1);
+                foundY = baseline.get(com.itextpdf.text.pdf.parser.Vector.I2);
+                found = true;
+                logger.info("Texto encontrado: '" + text + "' en posición X=" + foundX + ", Y=" + foundY);
+            }
+        }
+
+        public boolean isFound() {
+            return found;
+        }
+
+        public float getX() {
+            return foundX;
+        }
+
+        public float getY() {
+            return foundY;
+        }
     }
 }
