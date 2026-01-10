@@ -40,10 +40,12 @@ public class PDFGeneratorService {
             try (ByteArrayInputStream input = new ByteArrayInputStream(content.getBytes(Constantes.UTF_8))) {
                 String pathFonts = "../resource/webfonts/";
 
-                // Usar el helper de XMLWorker con ImageProvider personalizado
+                // Pre-procesar el contenido HTML para convertir imágenes base64 en archivos temporales
+                String processedContent = processBase64Images(content);
+
+                ByteArrayInputStream processedInput = new ByteArrayInputStream(processedContent.getBytes(Constantes.UTF_8));
                 XMLWorkerHelper worker = XMLWorkerHelper.getInstance();
-                worker.parseXHtml(writer, document, input, null, Charset.forName(Constantes.UTF_8),
-                    new XMLWorkerFontProvider(pathFonts), new Base64ImageProvider(pathFonts));
+                worker.parseXHtml(writer, document, processedInput, null, Charset.forName(Constantes.UTF_8), new XMLWorkerFontProvider(pathFonts));
             }//new StringReader("<p>helloworld</p>")); //
             document.addAuthor(Constantes.AUTHOR);
             document.addCreationDate();
@@ -148,5 +150,73 @@ public class PDFGeneratorService {
         }
 
         Files.delete(Paths.get(fileNameTemp));*/
+    }
+
+    /**
+     * Pre-procesa el HTML para convertir imágenes base64 embebidas en elementos Image de iText.
+     * Busca todas las etiquetas img con src data:image y las convierte directamente en objetos Image.
+     */
+    private static String processBase64Images(String htmlContent) {
+        try {
+            // Patrón para encontrar imágenes base64 en el HTML
+            // Busca: <img ... src="data:image/xxx;base64,XXXXX" ...>
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "(<img[^>]+src=['\"])(data:image/([^;]+);base64,([^'\"]+))(['\"][^>]*>)",
+                java.util.regex.Pattern.CASE_INSENSITIVE
+            );
+
+            java.util.regex.Matcher matcher = pattern.matcher(htmlContent);
+            StringBuffer result = new StringBuffer();
+            int imageCounter = 0;
+
+            while (matcher.find()) {
+                String fullDataUrl = matcher.group(2);
+                String imageFormat = matcher.group(3); // png, jpg, etc.
+                String base64Data = matcher.group(4);
+
+                try {
+                    // Decodificar base64
+                    byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Data);
+
+                    // Crear archivo temporal
+                    String tempFileName = System.getProperty("java.io.tmpdir") +
+                        java.io.File.separator + "img_" + System.currentTimeMillis() + "_" +
+                        imageCounter + "." + imageFormat;
+
+                    java.io.File tempFile = new java.io.File(tempFileName);
+                    java.nio.file.Files.write(tempFile.toPath(), imageBytes);
+                    tempFile.deleteOnExit();
+
+                    logger.info("Imagen base64 guardada en archivo temporal: " + tempFileName +
+                        " (tamaño: " + imageBytes.length + " bytes)");
+
+                    // Reemplazar la referencia base64 con la ruta del archivo temporal
+                    String replacement = matcher.group(1) +
+                        "file:///" + tempFileName.replace("\\", "/") +
+                        matcher.group(5);
+
+                    matcher.appendReplacement(result, java.util.regex.Matcher.quoteReplacement(replacement));
+                    imageCounter++;
+
+                } catch (Exception e) {
+                    logger.error("Error al procesar imagen base64: " + e.getMessage(), e);
+                    // Si falla, mantener el original
+                    matcher.appendReplacement(result, java.util.regex.Matcher.quoteReplacement(matcher.group(0)));
+                }
+            }
+
+            matcher.appendTail(result);
+
+            if (imageCounter > 0) {
+                logger.info("Se procesaron " + imageCounter + " imágenes base64");
+                return result.toString();
+            }
+
+        } catch (Exception e) {
+            logger.error("Error en processBase64Images: " + e.getMessage(), e);
+        }
+
+        // Si algo falla, devolver el contenido original
+        return htmlContent;
     }
 }
