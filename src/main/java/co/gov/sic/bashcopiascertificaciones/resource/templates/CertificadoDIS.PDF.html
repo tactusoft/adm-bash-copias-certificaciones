@@ -131,7 +131,8 @@
             </tr>
             <tr>
                 <td colspan="3" class="firma">
-                    <img class="grafo" th:src="|data:image/png;base64,${firma_base64}|" /><br />
+                    <!-- Firma se agregará programáticamente después del procesamiento HTML -->
+                    <div id="firma-placeholder" style="height: 100px; text-align: center;"></div>
                     <span th:text="${nombre_secretario}"></span><br />
                     <span style="font-size: 13px;" th:text="${cargo_secretario}"></span>
                 </td>

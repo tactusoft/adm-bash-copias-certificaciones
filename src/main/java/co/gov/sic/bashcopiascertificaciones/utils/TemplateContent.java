@@ -49,6 +49,7 @@ public class TemplateContent {
 			Locale.forLanguageTag("es-CO"));
 	private final TemplateEngine templateEngine;
 	private String templateName;
+	private byte[] firmaImageBytes; // Almacena los bytes de la imagen de firma
 
 	public TemplateContent(String templateName) {
 		this.templateName = templateName;
@@ -340,30 +341,52 @@ public class TemplateContent {
 		context.setVariable("texto_legal", Constantes.TEXTO_LEGALIZACION_FIRMA_SECRETARIO_AD_HOC);
 		log.info(String.format("co/gov/sic/bashcopiascertificaciones/resource/FIRMA_SECRETARIO_AD_HOC_%s.PNG",
 				Constantes.WS_CANCILLERIA_ID_AUTORIDAD_SECRETARIO_AD_HOC));
-		String imagenBase64 = getImageAsBase64(
+
+		// Cargar los bytes de la imagen de firma para agregarla programáticamente al PDF
+		this.firmaImageBytes = getImageAsBytes(
 				String.format("co/gov/sic/bashcopiascertificaciones/resource/FIRMA_SECRETARIO_AD_HOC_%s.PNG",
 						Constantes.WS_CANCILLERIA_ID_AUTORIDAD_SECRETARIO_AD_HOC));
-		context.setVariable("firma_base64", imagenBase64);
+
 		return this.templateEngine.process(String.format("../templates/%s.%s", this.templateName, "PDF.html"), context);
 	}
 
-	private String getImageAsBase64(String resourcePath) {
+	/**
+	 * Obtiene los bytes de la imagen de firma que fueron cargados durante el procesamiento del template.
+	 * @return bytes de la imagen de firma, o null si no se cargó ninguna imagen
+	 */
+	public byte[] getFirmaImageBytes() {
+		return this.firmaImageBytes;
+	}
+
+	/**
+	 * Carga una imagen desde el classpath y retorna sus bytes.
+	 * @param resourcePath Ruta de la imagen en el classpath
+	 * @return bytes de la imagen, o null si no se pudo cargar
+	 */
+	private byte[] getImageAsBytes(String resourcePath) {
 		try {
 			ClassLoader loader = TemplateContent.class.getClassLoader();
 			InputStream inputStream = loader.getResourceAsStream(resourcePath);
 			if (inputStream != null) {
 				byte[] imageBytes = inputStream.readAllBytes();
 				inputStream.close();
-				String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 				log.info("Imagen cargada exitosamente: " + resourcePath + " (tamaño: " + imageBytes.length + " bytes)");
-				return base64Image;
+				return imageBytes;
 			} else {
 				log.error("No se encontró la imagen en el classpath: " + resourcePath);
-				return "";
+				return null;
 			}
 		} catch (IOException e) {
 			log.error("Error al cargar imagen: " + resourcePath + " - " + e.getMessage(), e);
-			return "";
+			return null;
 		}
+	}
+
+	private String getImageAsBase64(String resourcePath) {
+		byte[] imageBytes = getImageAsBytes(resourcePath);
+		if (imageBytes != null) {
+			return Base64.getEncoder().encodeToString(imageBytes);
+		}
+		return "";
 	}
 }

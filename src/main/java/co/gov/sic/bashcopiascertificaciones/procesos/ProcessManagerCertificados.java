@@ -64,10 +64,14 @@ public class ProcessManagerCertificados {
 							TemplateContent templateContent = new TemplateContent("CertificadoDIS");
 							String html = templateContent.buildCertificadoSancionesPDFTemplate(detalle, tipoSancion,
 									sanciones, finalDate, now);
+
+							// Obtener los bytes de la firma para agregarla programáticamente al PDF
+							byte[] firmaBytes = templateContent.getFirmaImageBytes();
+
 							try (ByteArrayOutputStream fileContent = PDFGeneratorService.createPdf(html,
 									"Certificado Demandas, Investigaciones y Sanciones",
 									tramite.getIdtiposolicitud().getDescripcion(), Constantes.KEYWORDS_PDF_DEMANDAS,
-									true, null)) {
+									true, null, firmaBytes)) {
 								String fileName = String.format(
 										"%s_Certificado Demandas, Investigaciones y Sanciones_%s_%s%s_%s.%s",
 										detalle.getIdtramite(), detalle.getTipo_certifica(), detalle.getTipo_docu(),
