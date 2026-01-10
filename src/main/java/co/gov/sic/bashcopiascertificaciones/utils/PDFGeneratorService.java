@@ -10,14 +10,6 @@ import com.itextpdf.text.PageSize;
 import com.itextpdf.text.pdf.PdfWriter;
 import com.itextpdf.tool.xml.XMLWorkerFontProvider;
 import com.itextpdf.tool.xml.XMLWorkerHelper;
-import com.itextpdf.tool.xml.XMLWorker;
-import com.itextpdf.tool.xml.html.Tags;
-import com.itextpdf.tool.xml.parser.XMLParser;
-import com.itextpdf.tool.xml.pipeline.css.CSSResolver;
-import com.itextpdf.tool.xml.pipeline.css.CssPipeline;
-import com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline;
-import com.itextpdf.tool.xml.pipeline.html.HtmlPipeline;
-import com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -46,26 +38,12 @@ public class PDFGeneratorService {
             writer.setPageEvent(event);
             document.open();
             try (ByteArrayInputStream input = new ByteArrayInputStream(content.getBytes(Constantes.UTF_8))) {
-                XMLWorkerHelper worker = XMLWorkerHelper.getInstance();
-
                 String pathFonts = "../resource/webfonts/";
 
-                // Configurar procesador de imágenes personalizado para manejar imágenes base64
-                CSSResolver cssResolver = XMLWorkerHelper.getInstance().getDefaultCssResolver(true);
-                XMLWorkerFontProvider fontProvider = new XMLWorkerFontProvider(pathFonts);
-                HtmlPipelineContext htmlContext = new HtmlPipelineContext(null);
-                htmlContext.setImageProvider(new Base64ImageProvider(pathFonts));
-                htmlContext.setTagFactory(Tags.getHtmlTagProcessorFactory());
-                htmlContext.charSet(Charset.forName(Constantes.UTF_8));
-                htmlContext.setAcceptUnknown(true);
-
-                HtmlPipeline htmlPipeline = new HtmlPipeline(htmlContext, new PdfWriterPipeline(document, writer));
-                CssPipeline cssPipeline = new CssPipeline(cssResolver, htmlPipeline);
-
-                XMLWorker xmlWorker = new XMLWorker(cssPipeline, true);
-                XMLParser xmlParser = new XMLParser(xmlWorker, Charset.forName(Constantes.UTF_8));
-
-                xmlParser.parse(input, Charset.forName(Constantes.UTF_8));
+                // Usar el helper de XMLWorker con ImageProvider personalizado
+                XMLWorkerHelper worker = XMLWorkerHelper.getInstance();
+                worker.parseXHtml(writer, document, input, null, Charset.forName(Constantes.UTF_8),
+                    new XMLWorkerFontProvider(pathFonts), new Base64ImageProvider(pathFonts));
             }//new StringReader("<p>helloworld</p>")); //
             document.addAuthor(Constantes.AUTHOR);
             document.addCreationDate();
