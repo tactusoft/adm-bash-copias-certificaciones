@@ -41,7 +41,21 @@ public class PDFGeneratorService {
                 XMLWorkerHelper worker = XMLWorkerHelper.getInstance();
 
                 String pathFonts = "../resource/webfonts/";
-                worker.parseXHtml(writer, document,input, null, Charset.forName(Constantes.UTF_8), new XMLWorkerFontProvider(pathFonts));
+
+                // Configurar procesador de imágenes personalizado para manejar imágenes base64
+                com.itextpdf.tool.xml.XMLWorkerFontProvider fontProvider = new XMLWorkerFontProvider(pathFonts);
+                com.itextpdf.tool.xml.pipeline.css.CSSResolver cssResolver = com.itextpdf.tool.xml.XMLWorkerHelper.getInstance().getDefaultCssResolver(true);
+                com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext htmlContext = new com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext(null);
+                htmlContext.setImageProvider(new Base64ImageProvider(pathFonts));
+                htmlContext.setTagFactory(com.itextpdf.tool.xml.html.Tags.getHtmlTagProcessorFactory());
+
+                com.itextpdf.tool.xml.pipeline.html.HtmlPipeline htmlPipeline = new com.itextpdf.tool.xml.pipeline.html.HtmlPipeline(htmlContext, new com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline(document, writer));
+                com.itextpdf.tool.xml.pipeline.css.CssPipeline cssPipeline = new com.itextpdf.tool.xml.pipeline.css.CssPipeline(cssResolver, htmlPipeline);
+
+                com.itextpdf.tool.xml.XMLWorker xmlWorker = new com.itextpdf.tool.xml.XMLWorker(cssPipeline, true);
+                com.itextpdf.tool.xml.parser.XMLParser xmlParser = new com.itextpdf.tool.xml.parser.XMLParser(xmlWorker, Charset.forName(Constantes.UTF_8));
+
+                xmlParser.parse(input, Charset.forName(Constantes.UTF_8));
             }//new StringReader("<p>helloworld</p>")); //
             document.addAuthor(Constantes.AUTHOR);
             document.addCreationDate();
