@@ -48,20 +48,7 @@ public class PDFGeneratorService {
                 worker.parseXHtml(writer, document, input, null, Charset.forName(Constantes.UTF_8), new XMLWorkerFontProvider(pathFonts));
             }//new StringReader("<p>helloworld</p>")); //
 
-            // Si se proporcionó una imagen de firma, agregarla al documento
-            if (firmaImageBytes != null && firmaImageBytes.length > 0) {
-                try {
-                    com.itextpdf.text.Image firmaImage = com.itextpdf.text.Image.getInstance(firmaImageBytes);
-                    // Ajustar el tamaño de la imagen (230px de ancho como en el CSS)
-                    firmaImage.scaleToFit(230f, 100f);
-                    firmaImage.setAlignment(com.itextpdf.text.Element.ALIGN_CENTER);
-                    document.add(firmaImage);
-                    logger.info("Firma agregada programáticamente al PDF (tamaño: " + firmaImageBytes.length + " bytes)");
-                } catch (Exception e) {
-                    logger.error("Error al agregar firma al PDF: " + e.getMessage(), e);
-                }
-            }
-
+            // Agregar metadatos antes de cerrar el documento
             document.addAuthor(Constantes.AUTHOR);
             document.addCreationDate();
             document.addProducer();
@@ -69,7 +56,48 @@ public class PDFGeneratorService {
             document.addCreator(Constantes.AUTHOR);
             document.addTitle(title);
             document.addKeywords(keywords);
+
+            // Cerrar el documento para finalizar el contenido HTML
             document.close();
+
+            // Si se proporcionó una imagen de firma, agregarla en posición absoluta
+            if (firmaImageBytes != null && firmaImageBytes.length > 0) {
+                try {
+                    // Reabrir el PDF para agregar la firma en posición absoluta
+                    com.itextpdf.text.pdf.PdfReader reader = new com.itextpdf.text.pdf.PdfReader(bos.toByteArray());
+                    ByteArrayOutputStream finalBos = new ByteArrayOutputStream();
+                    com.itextpdf.text.pdf.PdfStamper stamper = new com.itextpdf.text.pdf.PdfStamper(reader, finalBos);
+
+                    // Obtener el PdfContentByte de la última página
+                    int totalPages = reader.getNumberOfPages();
+                    com.itextpdf.text.pdf.PdfContentByte canvas = stamper.getOverContent(totalPages);
+
+                    // Crear la imagen y configurar su tamaño
+                    com.itextpdf.text.Image firmaImage = com.itextpdf.text.Image.getInstance(firmaImageBytes);
+                    firmaImage.scaleToFit(230f, 100f);
+
+                    // Calcular posición centrada en la página
+                    // Página Letter: 612 x 792 puntos
+                    // Centrar horizontalmente: (612 - 230) / 2 = 191
+                    // Posición vertical: aproximadamente 200 puntos desde abajo (ajustar según necesidad)
+                    float xPosition = (PageSize.LETTER.getWidth() - 230f) / 2;
+                    float yPosition = 200f; // Ajustar esta posición según donde quieras la firma
+
+                    firmaImage.setAbsolutePosition(xPosition, yPosition);
+                    canvas.addImage(firmaImage);
+
+                    stamper.close();
+                    reader.close();
+
+                    // Reemplazar el contenido del ByteArrayOutputStream original con el nuevo
+                    bos.reset();
+                    bos.write(finalBos.toByteArray());
+
+                    logger.info("Firma agregada programáticamente al PDF en posición absoluta (tamaño: " + firmaImageBytes.length + " bytes)");
+                } catch (Exception e) {
+                    logger.error("Error al agregar firma al PDF: " + e.getMessage(), e);
+                }
+            }
 
         } catch (IOException | DocumentException ex) {
             logger.error(ex.toString());
