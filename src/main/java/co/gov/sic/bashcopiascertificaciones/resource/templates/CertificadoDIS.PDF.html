@@ -131,7 +131,7 @@
             </tr>
             <tr>
                 <td colspan="3" class="firma">
-                    <img class="grafo" th:src="'data:image/png;base64,' + ${firma_base64}" /><br />
+                    <img class="grafo" th:src="|data:image/png;base64,${firma_base64}|" /><br />
                     <span th:text="${nombre_secretario}"></span><br />
                     <span style="font-size: 13px;" th:text="${cargo_secretario}"></span>
                 </td>

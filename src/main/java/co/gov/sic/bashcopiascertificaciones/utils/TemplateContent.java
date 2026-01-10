@@ -354,13 +354,16 @@ public class TemplateContent {
 			if (inputStream != null) {
 				byte[] imageBytes = inputStream.readAllBytes();
 				inputStream.close();
-				return Base64.getEncoder().encodeToString(imageBytes);
+				String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+				log.info("Imagen cargada exitosamente: " + resourcePath + " (tamaño: " + imageBytes.length + " bytes)");
+				return base64Image;
 			} else {
-				log.error("No se encontró la imagen: " + resourcePath);
+				log.error("No se encontró la imagen en el classpath: " + resourcePath);
+				return "";
 			}
 		} catch (IOException e) {
-			log.error("Error al cargar imagen: " + e.getMessage());
+			log.error("Error al cargar imagen: " + resourcePath + " - " + e.getMessage(), e);
+			return "";
 		}
-		return "";
 	}
 }
