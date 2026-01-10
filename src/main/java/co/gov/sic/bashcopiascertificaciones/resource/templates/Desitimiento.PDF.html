@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es-co" xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <title>
+        </title>
+    </head>
+    
+    <body>
+        <div style='background-color: #EDEDF0; border: 1px solid #232331;'>
+            <h3
+                style='background-color: #232331; color: #ffffff; margin-top: 61px; padding-left: 15px; padding-right: 15px;'>SERVICIOS EN LINEA - SISTEMA DE SOLICITUD DE COPIAS Y CERTIFICACIONES</h3>
+            <div style='padding: 15px; padding-top: 10px;'>
+                <p>
+                    Se&ntilde;or(a)(es): <br />
+                    <h3 style='text-transform: uppercase; color: #2A2D82'
+                        th:text='${nombre}'></h3>
+                    <br /> La <strong>Superintendencia de Industria y Comercio</strong>
+                    recibi&oacute; su comunicaci&oacute;n mediante la cual se
+                    present&oacute; <span style='font-style: italic'  th:text="${asunto}"></span> bajo la
+                    siguiente radicaci&oacute;n:
+                </p>
+                <table
+                    style='background-color: #D8D8D8; border: 1px solid #2A2D82; margin-bottom: 15px; margin-top: 15px;'>
+                    <tr>
+                        <td
+                            style='font-weight: bold; color: #2A2D82; padding-right: 10px; padding-left: 10px;'>Expediente:</td>
+                        <td><span style='font-weight: bold; padding-right: 10px'
+                                  th:text="${expediente}"></span></td>
+                        <td
+                            style='font-weight: bold; color: #2A2D82; padding-right: 10px; padding-left: 10px;'>Fecha:</td>
+                        <td><span style='font-weight: bold; padding-right: 10px'
+                                  th:text="${fecha}"></span></td>
+                    </tr>
+
+                    <tr>
+                        <td
+                            style='font-weight: bold; color: #2A2D82; padding-right: 10px; padding-left: 10px;'>Dependencia:</td>
+                        <td colspan='3'><span style='padding-right: 10px'
+                                              th:text="${dependencia}"></span></td>
+                    </tr>
+                    <tr>
+                        <td
+                            style='font-weight: bold; color: #2A2D82; padding-right: 10px; padding-left: 10px;'>Tr&aacute;mite:</td>
+                        <td colspan='3'><span style='padding-right: 10px'
+                                              th:text="${tramite}"></span></td>
+                    </tr>
+                    <tr>
+                        <td
+                            style='font-weight: bold; color: #2A2D82; padding-right: 10px; padding-left: 10px;'>Evento:</td>
+                        <td colspan='3'><span style='padding-right: 10px'
+                                              th:text="${evento}"></span></td>
+                    </tr>
+                    <tr>
+                        <td
+                            style='font-weight: bold; color: #2A2D82; padding-right: 10px; padding-left: 10px;'>Actuaci&oacute;n:</td>
+                        <td colspan='3'><span style='padding-right: 10px'
+                                              th:text="${actuacion}"></span></td>
+                    </tr>
+                </table>
+                <p align="justify">
+                    En atención a la solicitud radicada en esta Superintendencia con el número del asunto, le
+                    informo que de acuerdo con lo dispuesto en el artículo 17 de la Ley 1437 de 2011, modificado
+                    por el artículo 1° de la Ley 1755 de 2015, cuando la autoridad constate que la radicación está
+                    incompleta en el curso de una actuación administrativa o advierta que el peticionario debe
+                    realizar una gestión de trámite o de pago a su cargo necesaria para adoptar una decisión de
+                    fondo, lo requerirá por una sola vez para que la efectúe en el término de diez (10) días
+                    siguientes a su solicitud y para que la complete en un término máximo de un (1) mes. A partir
+                    del día siguiente en que el interesado aporte los documentos o los pagos requeridos, se
+                    reactivara el término de diez (10) días para resolver su petición. Se entenderá que el
+                    peticionario ha desistido de su solicitud, cuando no satisfaga el requerimiento o pago requerido,
+                    salvo que antes de vencer el plazo concedido de un (1) mes, solicite prorroga hasta por un
+                    término igual.
+                </p>
+                <p align="justify">
+                    Según lo anterior la petición efectuada por usted mediante el radicado de la referencia, el
+                    Grupo de Trabajo de Notificaciones y Certificaciones de la Superintendencia de Industria y
+                    Comercio registra un requerimiento del día <span style='font-style: italic'  th:text="${fecha_modificacion}"></span>, sin embargo, a la fecha no se
+                    evidencia la respuesta a la mencionada solicitud.
+                </p>
+                <p align="justify">
+                    Por lo cual, vencidos los términos de un mes para atender el requerimiento realizado por la
+                    entidad, con la presente comunicación oficial se decreta el desistimiento y el archivo de la
+                    petición. Contra este acto procede el recurso de reposición dentro de los términos previstos en
+                    la Ley, sin perjuicio de que la respectiva solicitud pueda ser nuevamente presentada con el
+                    lleno de los requisitos legales
+                </p>
+                <p align="justify">
+                    Lo invitamos a evaluar los procesos de solicitud de copias y certificaciones atendidos por la
+                    Superintendencia de Industria y Comercio a través del link
+                    https://goo.gl/forms/T32hZMJbUaLdllQn1
+                </p>
+                <p>
+                    <br /> Atentamente,<br />
+                </p>
+                <p>
+                    <br /> <strong><span th:text="${depe_resp}"></span>
+                        <br />
+                        COORDINADORA GRUPO NOTIFICACIONES Y CERTIFICACIONES
+                    </strong>
+                </p>
+            </div>
+        </div>
+    </body>
+</html>
