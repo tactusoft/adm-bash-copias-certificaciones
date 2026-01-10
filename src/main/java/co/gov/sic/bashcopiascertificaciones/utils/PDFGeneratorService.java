@@ -10,6 +10,14 @@ import com.itextpdf.text.PageSize;
 import com.itextpdf.text.pdf.PdfWriter;
 import com.itextpdf.tool.xml.XMLWorkerFontProvider;
 import com.itextpdf.tool.xml.XMLWorkerHelper;
+import com.itextpdf.tool.xml.XMLWorker;
+import com.itextpdf.tool.xml.html.Tags;
+import com.itextpdf.tool.xml.parser.XMLParser;
+import com.itextpdf.tool.xml.pipeline.css.CSSResolver;
+import com.itextpdf.tool.xml.pipeline.css.CssPipeline;
+import com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline;
+import com.itextpdf.tool.xml.pipeline.html.HtmlPipeline;
+import com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -43,17 +51,19 @@ public class PDFGeneratorService {
                 String pathFonts = "../resource/webfonts/";
 
                 // Configurar procesador de imágenes personalizado para manejar imágenes base64
-                com.itextpdf.tool.xml.XMLWorkerFontProvider fontProvider = new XMLWorkerFontProvider(pathFonts);
-                com.itextpdf.tool.xml.pipeline.css.CSSResolver cssResolver = com.itextpdf.tool.xml.XMLWorkerHelper.getInstance().getDefaultCssResolver(true);
-                com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext htmlContext = new com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext(null);
+                CSSResolver cssResolver = XMLWorkerHelper.getInstance().getDefaultCssResolver(true);
+                XMLWorkerFontProvider fontProvider = new XMLWorkerFontProvider(pathFonts);
+                HtmlPipelineContext htmlContext = new HtmlPipelineContext(null);
                 htmlContext.setImageProvider(new Base64ImageProvider(pathFonts));
-                htmlContext.setTagFactory(com.itextpdf.tool.xml.html.Tags.getHtmlTagProcessorFactory());
+                htmlContext.setTagFactory(Tags.getHtmlTagProcessorFactory());
+                htmlContext.charSet(Charset.forName(Constantes.UTF_8));
+                htmlContext.setAcceptUnknown(true);
 
-                com.itextpdf.tool.xml.pipeline.html.HtmlPipeline htmlPipeline = new com.itextpdf.tool.xml.pipeline.html.HtmlPipeline(htmlContext, new com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline(document, writer));
-                com.itextpdf.tool.xml.pipeline.css.CssPipeline cssPipeline = new com.itextpdf.tool.xml.pipeline.css.CssPipeline(cssResolver, htmlPipeline);
+                HtmlPipeline htmlPipeline = new HtmlPipeline(htmlContext, new PdfWriterPipeline(document, writer));
+                CssPipeline cssPipeline = new CssPipeline(cssResolver, htmlPipeline);
 
-                com.itextpdf.tool.xml.XMLWorker xmlWorker = new com.itextpdf.tool.xml.XMLWorker(cssPipeline, true);
-                com.itextpdf.tool.xml.parser.XMLParser xmlParser = new com.itextpdf.tool.xml.parser.XMLParser(xmlWorker, Charset.forName(Constantes.UTF_8));
+                XMLWorker xmlWorker = new XMLWorker(cssPipeline, true);
+                XMLParser xmlParser = new XMLParser(xmlWorker, Charset.forName(Constantes.UTF_8));
 
                 xmlParser.parse(input, Charset.forName(Constantes.UTF_8));
             }//new StringReader("<p>helloworld</p>")); //
