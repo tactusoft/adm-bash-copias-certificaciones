@@ -399,7 +399,39 @@ public class TemplateContent {
 		AddRadicacion(radi, context);
 		context.setVariable("asunto", tipoTramite.getDescripcion());
 		context.setVariable("url", Utility.getURLConsultaRadicacionWeb(radi));
-		return this.templateEngine.process(String.format("../templates/Radicacion.%s.EMAIL", radi.getTipoRadicacion()),
-				context);
+
+		// Crear un TemplateEngine independiente para cargar el template de email
+		String emailTemplateName = String.format("Radicacion.%s.EMAIL", radi.getTipoRadicacion());
+		String fileName = String.format("co/gov/sic/bashcopiascertificaciones/resource/templates/%s.html", emailTemplateName);
+		log.info("Cargando template de email: " + fileName);
+
+		DefaultTemplateResolver emailTemplateResolver = new DefaultTemplateResolver();
+		try {
+			ClassLoader loader = TemplateContent.class.getClassLoader();
+			StringBuffer sb = new StringBuffer();
+			InputStream stream = loader.getResourceAsStream(fileName);
+			if (stream == null) {
+				log.error("No se encontró el template de email: " + fileName);
+				throw new Exception("Template de email no encontrado: " + fileName);
+			}
+			InputStreamReader isReader = new InputStreamReader(stream);
+			BufferedReader reader = new BufferedReader(isReader);
+			String str;
+			while ((str = reader.readLine()) != null) {
+				sb.append(str);
+			}
+			emailTemplateResolver.setTemplate(sb.toString());
+			log.info("Template de email cargado correctamente");
+		} catch (IOException ex) {
+			log.error("Error al cargar template de email: " + ex.toString());
+			throw ex;
+		}
+
+		emailTemplateResolver.setTemplateMode(TemplateMode.HTML);
+		TemplateEngine emailEngine = new TemplateEngine();
+		emailEngine.addDialect(new Java8TimeDialect());
+		emailEngine.setTemplateResolver(emailTemplateResolver);
+
+		return emailEngine.process(String.format("../templates/%s", emailTemplateName), context);
 	}
 }

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notificación de Radicación</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border: 1px solid #dddddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .header {
+            background-color: #003366;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px;
+            color: #333333;
+        }
+        .content h2 {
+            color: #003366;
+            font-size: 20px;
+            margin-top: 0;
+        }
+        .info-section {
+            background-color: #f9f9f9;
+            border-left: 4px solid #003366;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .info-row {
+            margin: 10px 0;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #003366;
+        }
+        .info-value {
+            color: #555555;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #003366;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .button:hover {
+            background-color: #004080;
+        }
+        .footer {
+            background-color: #f4f4f4;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666666;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Superintendencia de Industria y Comercio</h1>
+        </div>
+
+        <div class="content">
+            <h2>Notificación de Radicación</h2>
+
+            <p>Cordial saludo,</p>
+
+            <p>Le informamos que su solicitud ha sido radicada exitosamente en nuestro sistema.</p>
+
+            <div class="info-section">
+                <div class="info-row">
+                    <span class="info-label">Expediente:</span>
+                    <span class="info-value" th:text="${expediente}"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Fecha de Radicación:</span>
+                    <span class="info-value" th:text="${fecha}"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Asunto:</span>
+                    <span class="info-value" th:text="${asunto}"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Trámite:</span>
+                    <span class="info-value" th:text="${tramite}"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Evento:</span>
+                    <span class="info-value" th:text="${evento}"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Actuación:</span>
+                    <span class="info-value" th:text="${actuacion}"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Dependencia:</span>
+                    <span class="info-value" th:text="${dependencia}"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Folios:</span>
+                    <span class="info-value" th:text="${folios}"></span>
+                </div>
+            </div>
+
+            <p>Puede consultar el estado de su radicación haciendo clic en el siguiente enlace:</p>
+
+            <div class="button-container">
+                <a th:href="${url}" class="button">Consultar Radicación</a>
+            </div>
+
+            <p>Si tiene alguna pregunta o necesita asistencia adicional, por favor no dude en contactarnos.</p>
+
+            <p>Gracias por confiar en nuestros servicios.</p>
+        </div>
+
+        <div class="footer">
+            <p><strong>Superintendencia de Industria y Comercio</strong></p>
+            <p>Este es un correo electrónico automático, por favor no responda a este mensaje.</p>
+        </div>
+    </div>
+</body>
+</html>
