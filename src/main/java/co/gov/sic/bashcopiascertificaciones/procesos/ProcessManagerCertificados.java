@@ -47,6 +47,7 @@ import sic.ws.interop.entities.response.radicacion.ResponseRadicacion;
 public class ProcessManagerCertificados {
 
 	private static final Logger log = GetLogger.getInstance("ProcessManager", "conf/log4j.properties");
+	private static final Logger logTramites = Logger.getLogger("TramitesProcesados");
 	private static final InteropWSClient wsInteropClient = new InteropWSClient(Constantes.WS_INTEROP_USER,
 			Constantes.WS_INTEROP_PASS, Constantes.URL_WS_INTEROP, 500, false);
 	private static final String DIRECTORY = "/Users/carlossarmiento/Developer/SIC/copias/documentos/SL/Copias/CERTIFICACIONES";
@@ -139,13 +140,25 @@ public class ProcessManagerCertificados {
 
 									if (responseRadicacionAdjuntos.getCodigo() == 0) {
 										DataBaseConnectionCertificados.getInstance().actualizarTramite(tramite);
-										
+
 										String htmlEmail = templateContent.buildEmailTemplate(radi,
 												tramite.getIdtiposolicitud());
 										List<String> adjuntos = new LinkedList<>();
 										adjuntos.add(fullPath.toString());
 										MailService.Send(radi, tramite.getIdtiposolicitud().getDescripcion(),
 												htmlEmail, adjuntos);
+
+										// Log del trámite procesado
+										String correosEnviados = radicador.getEmails().stream()
+												.map(e -> e.getDescripcion())
+												.reduce((a, b) -> a + ", " + b)
+												.orElse("Sin email");
+										logTramites.info(String.format(
+												"IdTramite: %s | Radicación: %s-%s | Correos: %s",
+												tramite.getIdtramite(),
+												tramite.getAno_radi(),
+												tramite.getNume_radi(),
+												correosEnviados));
 									}
 								}
 							}
