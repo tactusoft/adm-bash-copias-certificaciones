@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -21,13 +23,22 @@ import co.gov.sic.bashcopiascertificaciones.database.DataBaseConnectionCertifica
 import co.gov.sic.bashcopiascertificaciones.entities.Cesl_detalleSolicitud;
 import co.gov.sic.bashcopiascertificaciones.entities.Cesl_tramite;
 import co.gov.sic.bashcopiascertificaciones.entities.Sancion;
+import co.gov.sic.bashcopiascertificaciones.enums.EstadoTramite;
 import co.gov.sic.bashcopiascertificaciones.enums.TipoSancion;
 import co.gov.sic.bashcopiascertificaciones.utils.Constantes;
 import co.gov.sic.bashcopiascertificaciones.utils.GetLogger;
+import co.gov.sic.bashcopiascertificaciones.utils.MailService;
 import co.gov.sic.bashcopiascertificaciones.utils.PDFGeneratorService;
 import co.gov.sic.bashcopiascertificaciones.utils.TemplateContent;
 import co.gov.sic.bashcopiascertificaciones.utils.Utility;
+import co.gov.sic.copiasycertificaciones.entities.ws.request.RequestSignPDF;
+import co.gov.sic.copiasycertificaciones.entities.ws.response.ResponseSignPDF;
+import co.gov.sic.copiasycertificaciones.ws.client.soap.WSSignClient;
 import sic.ws.interop.api.InteropWSClient;
+import sic.ws.interop.entities.Perfil;
+import sic.ws.interop.entities.Persona;
+import sic.ws.interop.entities.radicacion.Radicacion;
+import sic.ws.interop.entities.response.radicacion.ResponseRadicacion;
 
 /**
  *
@@ -38,14 +49,24 @@ public class ProcessManagerCertificados {
 	private static final Logger log = GetLogger.getInstance("ProcessManager", "conf/log4j.properties");
 	private static final InteropWSClient wsInteropClient = new InteropWSClient(Constantes.WS_INTEROP_USER,
 			Constantes.WS_INTEROP_PASS, Constantes.URL_WS_INTEROP, 500, false);
+	private static final String DIRECTORY = "/Users/carlossarmiento/Developer/SIC/copias/documentos/SL/Copias/CERTIFICACIONES";
 
 	public ProcessManagerCertificados() throws BadElementException, IOException {
 		log.info("Inicia proceso...");
 	}
 
-	public void pending() {
+	public void pending() throws Exception {
 		List<Cesl_tramite> tramites = DataBaseConnectionCertificados.getInstance().getRequestPending();
 		if (tramites.size() > 0) {
+			Perfil perfilRadicacion = DataBaseConnectionCertificados.getInstance().getPerfilCertificado();
+
+			RequestSignPDF requestSign = new RequestSignPDF();
+			requestSign.setPasswordCliente(Constantes.WS_SIGN_PASS);
+			requestSign.setIdCliente(Constantes.WS_SIGN_USER);
+			requestSign.setIdPolitica(Constantes.WS_SIGN_ID_POLITICA_SIN_ESTAMPA);
+			requestSign.setStringToFind(Constantes.WS_SIGN_NOMBRE_SECRETARIO_AD_HOC);
+			requestSign.setNoPagina("0");
+
 			tramites.forEach(tramite -> {
 				log.info("Procesando radicado: " + tramite.getIdtramite());
 				Cesl_detalleSolicitud detalle = DataBaseConnectionCertificados.getInstance()
@@ -76,12 +97,57 @@ public class ProcessManagerCertificados {
 										"%s_Certificado Demandas, Investigaciones y Sanciones_%s_%s%s_%s.%s",
 										detalle.getIdtramite(), detalle.getTipo_certifica(), detalle.getTipo_docu(),
 										detalle.getNume_docu(), index, Constantes.PDF_EXTENSION);
-								
-								String directorio = "/Users/carlossarmiento/Developer/SIC/copias/documentos/SL/Copias/CERTIFICACIONES";
-							    Path rutaCompleta = Paths.get(directorio, fileName);
-							    Files.write(rutaCompleta, fileContent.toByteArray());
-							    
-							    log.info("Archivo guardado en: " + rutaCompleta.toString());
+
+								Path fullPath = Paths.get(DIRECTORY, fileName);
+								Files.write(fullPath, fileContent.toByteArray());
+
+								requestSign.setFilePath(fullPath.toString());
+								String base64EncodedPdf = this.signDocument(requestSign, fileName);
+
+								log.info("Archivo guardado en: " + fullPath.toString());
+
+								Radicacion radi = new Radicacion();
+								Persona radicador = new Persona();
+								radicador.setId(tramite.getIden_pers());
+
+								radicador.setRetornarSoloUltimosDatos(true);
+								InteropWSClient wsInteropClient = Utility.GetWSClient();
+								radicador = wsInteropClient.personaConsultar(radicador).getPersona();
+								radi.setRadicador(radicador);
+								radi.setPerfil(perfilRadicacion);
+								radi.setTipoRadicacion(Constantes.TIPO_RADICACION_ENTRADA);
+								radi.setTotalFolios(1);
+								radi.setMedioEntrada(Constantes.WS_RADICACION_MEDIO_ENTRADA);
+								radi.setIdFuncionario(Constantes.WS_RADICACION_FUNCIONARIO_RADICADOR_ID);
+								radi.setIdTasa(Constantes.WS_RADICACION_CONS_TASA);
+								ResponseRadicacion responseRadicacion = new ResponseRadicacion();
+								radi.setObservaciones(
+										"Se genera este certificado por problemas en las tarifas a través de un proceso masivo.");
+								responseRadicacion = wsInteropClient.radicacionRegistrar(radi);
+								if (responseRadicacion.getCodigo() == 0) {
+									radi = responseRadicacion.getRadicacion();
+									radi.setRadicador(radicador);
+									tramite.setAno_radi(radi.getAnio());
+									tramite.setNume_radi(radi.getNumero());
+									tramite.setCont_radi(radi.getControl());
+									tramite.setCons_radi(radi.getConsecutivo());
+									tramite.setEstado(EstadoTramite.FINALIZADO);
+
+									radi.addAdjunto(base64EncodedPdf, fileName, true);
+									ResponseRadicacion responseRadicacionAdjuntos = wsInteropClient
+											.radicacionAdjuntosRegistrar(radi);
+
+									if (responseRadicacionAdjuntos.getCodigo() == 0) {
+										DataBaseConnectionCertificados.getInstance().actualizarTramite(tramite);
+										
+										String htmlEmail = templateContent.buildEmailTemplate(radi,
+												tramite.getIdtiposolicitud());
+										List<String> adjuntos = new LinkedList<>();
+										adjuntos.add(fullPath.toString());
+										MailService.Send(radi, tramite.getIdtiposolicitud().getDescripcion(),
+												htmlEmail, adjuntos);
+									}
+								}
 							}
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -91,6 +157,52 @@ public class ProcessManagerCertificados {
 				}
 			});
 		}
+	}
+
+	private String signDocument(RequestSignPDF requestSign, String fileName) throws Exception {
+		int attempts = 0;
+		boolean success = false;
+		ResponseSignPDF responseSign = null;
+
+		while (attempts < 6 && !success) {
+			try {
+				WSSignClient wsSign = new WSSignClient();
+				responseSign = wsSign.Firmar(requestSign);
+				if (responseSign != null && responseSign.getDocumento() != null) {
+					success = true;
+				} else {
+					throw new Exception("Error en la firma: Documento no disponible.");
+				}
+			} catch (Exception ex) {
+				attempts++;
+				log.error("Intento " + attempts + " fallido al firmar el PDF: " + ex.getMessage());
+
+				if (attempts >= 6) {
+					log.error("Fallo la firma del PDF tras 6 intentos.");
+					throw new Exception("Error tras varios intentos al firmar el documento.");
+				}
+
+				try {
+					Thread.sleep(10000);
+				} catch (InterruptedException e) {
+					log.error("Error al dormir el hilo entre intentos de firma: " + e.getMessage());
+				}
+			}
+		}
+
+		if (responseSign != null && responseSign.getDocumento() != null) {
+			byte[] filesBytes = responseSign.getDocumento();
+			if (filesBytes != null) {
+				Path fullPath = Paths.get(DIRECTORY, fileName);
+				Files.write(fullPath, filesBytes);
+				log.info("Archivo firmado guardado en: " + fullPath.toString());
+				return Base64.getEncoder().encodeToString(filesBytes);
+			} else {
+				log.error("PDF Firma Certificado: " + responseSign.getRespuestaObj().getMensajes().getMensaje());
+			}
+		}
+
+		return null;
 	}
 
 }

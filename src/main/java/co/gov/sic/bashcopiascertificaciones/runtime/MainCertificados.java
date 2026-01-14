@@ -1,14 +1,10 @@
 package co.gov.sic.bashcopiascertificaciones.runtime;
 
-import java.io.IOException;
 import java.sql.SQLException;
-
-import com.itextpdf.text.BadElementException;
 
 import co.gov.sic.bashcopiascertificaciones.database.DataBaseConfig;
 import co.gov.sic.bashcopiascertificaciones.database.DataBaseConnection;
 import co.gov.sic.bashcopiascertificaciones.database.DataBaseConnectionCertificados;
-import co.gov.sic.bashcopiascertificaciones.enums.EstadoTramite;
 import co.gov.sic.bashcopiascertificaciones.procesos.ProcessManagerCertificados;
 import co.gov.sic.bashcopiascertificaciones.utils.Constantes;
 
@@ -21,7 +17,7 @@ public class MainCertificados {
 			DataBaseConnectionCertificados.getInstance();
 			ProcessManagerCertificados pMng = new ProcessManagerCertificados();
 			pMng.pending();
-		} catch (BadElementException | IOException | NullPointerException e) {
+		} catch (Exception e) {
 			return;
 		}
 

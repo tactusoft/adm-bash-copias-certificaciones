@@ -42,6 +42,13 @@ public class MailService {
 		Send(subject, content, tos, radi.getAdjuntos());
 	}
 
+	public static void Send(Radicacion radi, String subject, String content, List<String> filesPath) {
+		String to = radi.getRadicador().getEmails().get(0).getDescripcion();
+		List<String> tos = new ArrayList<>();
+		tos.add(to);
+		Send(tos, subject, content, filesPath);
+	}
+
 	public static void Send(String to, String subject, String content) {
 		List<String> tos = new ArrayList<>();
 		tos.add(to);

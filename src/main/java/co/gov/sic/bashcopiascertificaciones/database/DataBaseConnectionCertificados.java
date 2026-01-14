@@ -25,6 +25,7 @@ import co.gov.sic.bashcopiascertificaciones.entities.Cesl_tramite;
 import co.gov.sic.bashcopiascertificaciones.entities.Sancion;
 import co.gov.sic.bashcopiascertificaciones.enums.TipoSancion;
 import co.gov.sic.bashcopiascertificaciones.utils.GetLogger;
+import sic.ws.interop.entities.Perfil;
 
 /**
  *
@@ -39,7 +40,7 @@ public class DataBaseConnectionCertificados {
 
 	private static final String SQL_REQUEST_PENDING = "SELECT idtramite, idtiposolicitud, ano_radi, nume_radi, cont_radi, cons_radi, estado, valor_total, "
 			+ "fecha_creacion, fecha_modificacion, medio_respuesta, iden_pers, ano_recibo, num_recibo, func_asignado "
-			+ "FROM cesl_tramite WHERE idtiposolicitud = 1 AND (estado = 6 or estado = 9) AND idtramite = 20667"
+			+ "FROM cesl_tramite WHERE idtiposolicitud = 1 AND (estado = 6 or estado = 9) AND idtramite in (20667,20668)"
 			+ "ORDER BY fecha_creacion";
 
 	private static final String SQL_REQUEST_DETAIL = "select idtramite, tipo_docu, nume_docu, cantidad, anos, tipo_certifica "
@@ -122,6 +123,10 @@ public class DataBaseConnectionCertificados {
 			+ "	(r.codi_tram = 384 AND r.codi_even in (328,330) AND r.codi_Actu in (460,653,706,707)) OR"
 			+ "	(r.codi_tram in (388,389,390,105,414) AND r.codi_even in (356,357,358,327,325,328) AND r.codi_Actu in (460,653,706,707,500))"
 			+ " ) AND a2.fech_acto BETWEEN ? AND ? group by r.ano_radi, r.nume_Radi";
+
+	private static final String SQL_PERFIL_TRAMITE = "SELECT codi_depe, codi_tram, codi_even, codi_actu FROM cesl_tiposolicitud WHERE idtiposolicitud = 7";
+	
+	private static final String SQL_UPDATE_TRAMITE = "UPDATE cesl_tramite SET ano_radi = ?, nume_radi = ?, cons_radi = ?, cont_radi = ?, estado = ?, fecha_modificacion = CURRENT year to second, ano_recibo = ?, num_recibo = ? WHERE idtramite = ?";
 
 	private DataBaseConnectionCertificados() {
 		dbCfg = DataBaseConfig.getInstance();
@@ -363,6 +368,44 @@ public class DataBaseConnectionCertificados {
 		}
 		Collections.sort(response);
 		return response;
+	}
+
+	public Perfil getPerfilCertificado() throws Exception {
+		Perfil result = null;
+		try (PreparedStatement pr = dbConnection.prepareStatement(SQL_PERFIL_TRAMITE)) {
+			try (ResultSet rs = pr.executeQuery()) {
+				if (rs.next()) {
+					result = new Perfil();
+					result.setDependencia(rs.getShort("codi_depe"));
+					result.setTramite(rs.getShort("codi_tram"));
+					result.setEvento(rs.getShort("codi_even"));
+					result.setActuacion(rs.getShort("codi_actu"));
+				}
+			}
+		}
+		return result;
+	}
+	
+	public void actualizarTramite(Cesl_tramite tram) throws Exception {
+		try (PreparedStatement stmt = dbConnection.prepareStatement(SQL_UPDATE_TRAMITE)) {
+			stmt.setInt(1, tram.getAno_radi());
+			stmt.setInt(2, tram.getNume_radi());
+			stmt.setInt(3, tram.getCons_radi());
+			stmt.setString(4, tram.getCont_radi());
+			stmt.setString(5, String.valueOf(tram.getEstado().getValue()));
+			if (tram.getAno_recibo() == null) {
+				stmt.setNull(6, java.sql.Types.INTEGER);
+			} else {
+				stmt.setInt(6, tram.getAno_recibo());
+			}
+			if (tram.getNume_recibo() == null) {
+				stmt.setNull(7, java.sql.Types.INTEGER);
+			} else {
+				stmt.setInt(7, tram.getNume_recibo());
+			}
+			stmt.setInt(8, tram.getIdtramite());
+			stmt.executeUpdate();
+		}
 	}
 
 }

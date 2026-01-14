@@ -342,7 +342,8 @@ public class TemplateContent {
 		log.info(String.format("co/gov/sic/bashcopiascertificaciones/resource/FIRMA_SECRETARIO_AD_HOC_%s.PNG",
 				Constantes.WS_CANCILLERIA_ID_AUTORIDAD_SECRETARIO_AD_HOC));
 
-		// Cargar los bytes de la imagen de firma para agregarla programáticamente al PDF
+		// Cargar los bytes de la imagen de firma para agregarla programáticamente al
+		// PDF
 		this.firmaImageBytes = getImageAsBytes(
 				String.format("co/gov/sic/bashcopiascertificaciones/resource/FIRMA_SECRETARIO_AD_HOC_%s.PNG",
 						Constantes.WS_CANCILLERIA_ID_AUTORIDAD_SECRETARIO_AD_HOC));
@@ -351,7 +352,9 @@ public class TemplateContent {
 	}
 
 	/**
-	 * Obtiene los bytes de la imagen de firma que fueron cargados durante el procesamiento del template.
+	 * Obtiene los bytes de la imagen de firma que fueron cargados durante el
+	 * procesamiento del template.
+	 * 
 	 * @return bytes de la imagen de firma, o null si no se cargó ninguna imagen
 	 */
 	public byte[] getFirmaImageBytes() {
@@ -360,6 +363,7 @@ public class TemplateContent {
 
 	/**
 	 * Carga una imagen desde el classpath y retorna sus bytes.
+	 * 
 	 * @param resourcePath Ruta de la imagen en el classpath
 	 * @return bytes de la imagen, o null si no se pudo cargar
 	 */
@@ -388,5 +392,14 @@ public class TemplateContent {
 			return Base64.getEncoder().encodeToString(imageBytes);
 		}
 		return "";
+	}
+
+	public String buildEmailTemplate(Radicacion radi, TipoTramite tipoTramite) throws Exception {
+		Context context = new Context();
+		AddRadicacion(radi, context);
+		context.setVariable("asunto", tipoTramite.getDescripcion());
+		context.setVariable("url", Utility.getURLConsultaRadicacionWeb(radi));
+		return this.templateEngine.process(String.format("../templates/Radicacion.%s.EMAIL", radi.getTipoRadicacion()),
+				context);
 	}
 }
