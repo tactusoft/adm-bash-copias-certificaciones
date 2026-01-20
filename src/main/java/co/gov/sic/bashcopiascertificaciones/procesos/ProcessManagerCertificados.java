@@ -37,7 +37,10 @@ import co.gov.sic.copiasycertificaciones.ws.client.soap.WSSignClient;
 import sic.ws.interop.api.InteropWSClient;
 import sic.ws.interop.entities.Perfil;
 import sic.ws.interop.entities.Persona;
+import sic.ws.interop.entities.Tramite;
 import sic.ws.interop.entities.radicacion.Radicacion;
+import sic.ws.interop.entities.request.RequestTramite;
+import sic.ws.interop.entities.response.ResponseTramite;
 import sic.ws.interop.entities.response.radicacion.ResponseRadicacion;
 
 /**
@@ -203,6 +206,133 @@ public class ProcessManagerCertificados {
 		}
 
 		return null;
+	}
+
+	public void pending3() throws Exception {
+		// Array de radicados a procesar (formato: año-número)
+		String[][] radicados = { { "26", "10399" }, { "26", "10400" }, { "26", "10402" }, { "26", "10403" },
+				{ "26", "10404" }, { "26", "10405" }, { "26", "10406" }, { "26", "10407" }, { "26", "10408" },
+				{ "26", "10409" }, { "26", "10412" }, { "26", "10413" }, { "26", "10414" }, { "26", "10415" } };
+
+		Cesl_tramite tramite = DataBaseConnectionCertificados.getInstance().getRequestPending2().get(0);
+		if (tramite != null) {
+			Perfil perfilRadicacion = DataBaseConnectionCertificados.getInstance().getPerfilCertificado();
+			RequestSignPDF requestSign = new RequestSignPDF();
+			requestSign.setPasswordCliente(Constantes.WS_SIGN_PASS);
+			requestSign.setIdCliente(Constantes.WS_SIGN_USER);
+			requestSign.setIdPolitica(Constantes.WS_SIGN_ID_POLITICA_SIN_ESTAMPA);
+			requestSign.setStringToFind(Constantes.WS_SIGN_NOMBRE_SECRETARIO_AD_HOC);
+			requestSign.setNoPagina("0");
+
+			log.info("Procesando tramite: " + tramite.getIdtramite());
+			Cesl_detalleSolicitud detalle = DataBaseConnectionCertificados.getInstance()
+					.getRequestDetail(tramite.getIdtramite());
+
+			if (detalle != null) {
+				TipoSancion tipoSancion = TipoSancion.fromValue(detalle.getTipo_certifica());
+				LocalDateTime now = LocalDateTime.now();
+				LocalDateTime finalDate = Utility.getStartDateFromTodayAnYears(detalle.getAnos(), now);
+				List<Sancion> sanciones = DataBaseConnectionCertificados.getInstance().consultarSanciones(
+						detalle.getTipo_docu(), detalle.getNume_docu(), tipoSancion, finalDate, now);
+				log.info("sanciones: " + sanciones.size());
+
+				// Iterar sobre cada radicado del array
+				for (String[] radicado : radicados) {
+					short anoRadi = Short.parseShort(radicado[0]);
+					int numeRadi = Integer.parseInt(radicado[1]);
+
+					try {
+						// Consultar la radicación existente
+						InteropWSClient wsInteropClient = Utility.GetWSClient();
+						RequestTramite request = new RequestTramite();
+						request.setAnio(anoRadi);
+						request.setNumero(numeRadi);
+						request.setExcluirDependencias(false);
+						ResponseTramite responseConsulta = wsInteropClient.radicacionConsultar(request);
+
+						if (responseConsulta.getCodigo() == 0) {
+							log.info("Procesando radicado: " + anoRadi + "-" + numeRadi);
+							List<Tramite> expedientes = responseConsulta.getExpedientes();
+							if (!expedientes.isEmpty()) {
+								Tramite tram = expedientes.get(0);
+
+								Persona radicador = new Persona();
+								radicador.setId(tramite.getIden_pers());
+								radicador.setRetornarSoloUltimosDatos(true);
+								radicador = wsInteropClient.personaConsultar(radicador).getPersona();
+
+								Radicacion radiSalida = new Radicacion();
+								radiSalida.setAnio(tram.getAnio());
+								radiSalida.setNumero(tram.getNumero());
+								radiSalida.setControl(tram.getControl());
+								perfilRadicacion.setActuacion((short) 440);
+								radiSalida.setPerfil(perfilRadicacion);
+								radiSalida.setMedioEntrada(Constantes.WS_RADICACION_MEDIO_ENTRADA);
+								radiSalida.setIdFuncionario(Constantes.WS_RADICACION_FUNCIONARIO_RADICADOR_ID);
+								radiSalida.setRadicador(radicador);
+								radiSalida.setTotalFolios(1);
+								radiSalida.setIdTasa(Constantes.WS_RADICACION_CONS_TASA);
+								radiSalida.setTipoRadicacion(Constantes.TIPO_RADICACION_SALIDA);
+								ResponseRadicacion responseRadicacion = wsInteropClient.radicacionRegistrar(radiSalida);
+								if (responseRadicacion.getCodigo() == 0) {
+									radiSalida = responseRadicacion.getRadicacion();
+									TemplateContent templateContent = new TemplateContent("CertificadoDIS");
+									String html = templateContent.buildCertificadoSancionesPDFTemplate(detalle,
+											tipoSancion, sanciones, finalDate, now);
+
+									byte[] firmaBytes = templateContent.getFirmaImageBytes();
+
+									try (ByteArrayOutputStream fileContent = PDFGeneratorService.createPdf(html,
+											"Certificado Demandas, Investigaciones y Sanciones",
+											tramite.getIdtiposolicitud().getDescripcion(),
+											Constantes.KEYWORDS_PDF_DEMANDAS, true, null, firmaBytes)) {
+										String fileName = String.format(
+												"%s_%s-%s_Certificado Demandas, Investigaciones y Sanciones_%s_%s%s.%s",
+												detalle.getIdtramite(), anoRadi, numeRadi, detalle.getTipo_certifica(),
+												detalle.getTipo_docu(), detalle.getNume_docu(),
+												Constantes.PDF_EXTENSION);
+
+										Path fullPath = Paths.get(DIRECTORY, fileName);
+										Files.write(fullPath, fileContent.toByteArray());
+
+										requestSign.setFilePath(fullPath.toString());
+										String base64EncodedPdf = this.signDocument(requestSign, fileName);
+
+										log.info("Archivo guardado en: " + fullPath.toString());
+
+										// Agregar adjunto a la radicación existente
+										radiSalida.addAdjunto(base64EncodedPdf, fileName, true);
+										ResponseRadicacion responseRadicacionAdjuntos = wsInteropClient
+												.radicacionAdjuntosRegistrar(radiSalida);
+
+										if (responseRadicacionAdjuntos.getCodigo() == 0) {
+											log.info("Adjunto registrado exitosamente para radicado: " + anoRadi + "-"
+													+ numeRadi);
+
+											String htmlEmail = templateContent.buildEmailTemplate(radiSalida,
+													tramite.getIdtiposolicitud());
+											List<String> adjuntos = new LinkedList<>();
+											adjuntos.add(fullPath.toString());
+											MailService.Send(radiSalida, tramite.getIdtiposolicitud().getDescripcion(),
+													htmlEmail, adjuntos);
+										} else {
+											log.error("Error al registrar adjunto para radicado: " + anoRadi + "-"
+													+ numeRadi + " - " + responseRadicacionAdjuntos.getMensaje());
+										}
+									}
+								}
+							}
+						} else {
+							log.error("Error al consultar radicado: " + anoRadi + "-" + numeRadi + " - "
+									+ responseConsulta.getMensaje());
+						}
+					} catch (Exception e) {
+						log.error("Error procesando radicado: " + anoRadi + "-" + numeRadi);
+						e.printStackTrace();
+					}
+				}
+			}
+		}
 	}
 
 }
