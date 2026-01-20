@@ -16,7 +16,7 @@ public class MainCertificados {
 			DataBaseConfig.getInstance();
 			DataBaseConnectionCertificados.getInstance();
 			ProcessManagerCertificados pMng = new ProcessManagerCertificados();
-			pMng.pending();
+			pMng.pending3();
 		} catch (Exception e) {
 			return;
 		}

@@ -43,6 +43,14 @@ public class DataBaseConnectionCertificados {
 			+ "FROM cesl_tramite WHERE idtiposolicitud = 1 AND (estado = 6 or estado = 9) AND idtramite in (20667,20668)"
 			+ "ORDER BY fecha_creacion";
 
+	private static final String SQL_REQUEST_PENDING_2 = "SELECT idtramite, idtiposolicitud, ano_radi, nume_radi, cont_radi, cons_radi, estado, valor_total, "
+			+ "fecha_creacion, fecha_modificacion, medio_respuesta, iden_pers, ano_recibo, num_recibo, func_asignado "
+			+ "FROM cesl_tramite WHERE idtramite = 10416";
+
+	private static final String SQL_REQUEST_PENDING_3 = "SELECT idtramite, idtiposolicitud, ano_radi, nume_radi, cont_radi, cons_radi, estado, valor_total, "
+			+ "fecha_creacion, fecha_modificacion, medio_respuesta, iden_pers, ano_recibo, num_recibo, func_asignado "
+			+ "FROM cesl_tramite WHERE idtramite = 10416";
+
 	private static final String SQL_REQUEST_DETAIL = "select idtramite, tipo_docu, nume_docu, cantidad, anos, tipo_certifica "
 			+ "from cesl_detallesolicitud " + "where idtramite = ?";
 
@@ -196,6 +204,64 @@ public class DataBaseConnectionCertificados {
 		}
 		return response;
 
+	}
+
+	public Cesl_tramite getRequestPending2() {
+		Cesl_tramite tramite = null;
+		try {
+			PreparedStatement stmt = dbConnection.prepareStatement(SQL_REQUEST_PENDING_2);
+			ResultSet rs = stmt.executeQuery();
+			if (rs.next()) {
+				tramite = new Cesl_tramite();
+				tramite.setIdtramite(rs.getInt("idtramite"));
+				tramite.setAno_radi(rs.getShort("ano_radi"));
+				tramite.setNume_radi(rs.getInt("nume_radi"));
+				tramite.setFunc_asignado(rs.getLong("func_asignado"));
+				tramite.setIden_pers(rs.getLong("iden_pers"));
+				Timestamp fechaModi = rs.getTimestamp("fecha_modificacion");
+				if (fechaModi != null) {
+					tramite.setFecha_modificacion(fechaModi.toLocalDateTime());
+				}
+				Timestamp fechaCreacion = rs.getTimestamp("fecha_creacion");
+				if (fechaCreacion != null) {
+					tramite.setFecha_creacion(fechaCreacion.toLocalDateTime());
+				}
+				tramite.setIdtiposolicitud(rs.getInt("idtiposolicitud"));
+			}
+
+		} catch (SQLException e) {
+			log.error(e.toString());
+		}
+		return tramite;
+	}
+
+	public Cesl_tramite getRequestPending3() {
+		Cesl_tramite tramite = null;
+		try {
+			PreparedStatement stmt = dbConnection.prepareStatement(SQL_REQUEST_PENDING_3);
+			ResultSet rs = stmt.executeQuery();
+			if (rs.next()) {
+				tramite = new Cesl_tramite();
+				tramite.setIdtramite(rs.getInt("idtramite"));
+				tramite.setAno_radi(rs.getShort("ano_radi"));
+				tramite.setNume_radi(rs.getInt("nume_radi"));
+				tramite.setFunc_asignado(rs.getLong("func_asignado"));
+				tramite.setIden_pers(rs.getLong("iden_pers"));
+				Timestamp fechaModi = rs.getTimestamp("fecha_modificacion");
+				if (fechaModi != null) {
+					tramite.setFecha_modificacion(fechaModi.toLocalDateTime());
+				}
+				Timestamp fechaCreacion = rs.getTimestamp("fecha_creacion");
+				if (fechaCreacion != null) {
+					tramite.setFecha_creacion(fechaCreacion.toLocalDateTime());
+				}
+				tramite.setIdtiposolicitud(rs.getInt("idtiposolicitud"));
+			}
+
+		} catch (SQLException e) {
+			log.error(e.toString());
+		}
+		return tramite;
 	}
 
 	public Cesl_detalleSolicitud getRequestDetail(Integer idtramite) {
