@@ -402,7 +402,8 @@ public class TemplateContent {
 
 		// Crear un TemplateEngine independiente para cargar el template de email
 		String emailTemplateName = String.format("Radicacion.%s.EMAIL", radi.getTipoRadicacion());
-		String fileName = String.format("co/gov/sic/bashcopiascertificaciones/resource/templates/%s.html", emailTemplateName);
+		String fileName = String.format("co/gov/sic/bashcopiascertificaciones/resource/templates/%s.html",
+				emailTemplateName);
 		log.info("Cargando template de email: " + fileName);
 
 		DefaultTemplateResolver emailTemplateResolver = new DefaultTemplateResolver();
@@ -433,5 +434,55 @@ public class TemplateContent {
 		emailEngine.setTemplateResolver(emailTemplateResolver);
 
 		return emailEngine.process(String.format("../templates/%s", emailTemplateName), context);
+	}
+
+	public String buildRadicacionPDFTemplate(Radicacion radi, Cesl_tramite tramite,
+			List<Cesl_detalleSolicitud> detalles) throws Exception {
+		String nombrePdf = "";
+		switch (tramite.getIdtiposolicitud()) {
+		case CERTIFICADO_SANCIONES:
+			nombrePdf = "RadicacionCDIS";
+			break;
+		case CERTIFICADO_REPRESENTACION_CAMARAS:
+			nombrePdf = "RadicacionCERCC";
+			break;
+		case CERTIFICADO_FIRMAS_SECRETARIOS_CAMARAS:
+			nombrePdf = "RadicacionFSCC";
+			break;
+		case COPIAS_SIMPLES:
+			nombrePdf = "RadicacionSC";
+			break;
+		case LISTADOS_INFORMACION:
+			nombrePdf = "RadicacionLI";
+			break;
+		case CORRECCION_REPRESENTACION_CAMARAS:
+			nombrePdf = "RadicacionCCC";
+			break;
+		default:
+			break;
+		}
+		Context context = new Context();
+		AddRadicacion(radi, context);
+		AddPersona(radi.getRadicador(), context, null);
+		context.setVariable("asunto", tramite.getIdtiposolicitud().getDescripcion());
+		for (Cesl_detalleSolicitud d : detalles) {
+			if (d.getVariableAdicional2() == null) {
+				d.setVariableAdicional2(Constantes.STR_EMPTY);
+			}
+			if (tramite.getIdtiposolicitud() == TipoTramite.CERTIFICADO_FIRMAS_SECRETARIOS_CAMARAS && detalles != null
+					&& detalles.size() > 0) {
+				if (d.getObservaciones() != null) {
+					String fileNameAndSAH1 = d.getObservaciones();
+					String fileName = fileNameAndSAH1.split(Constantes.FILENAME_CHECKSUM_SEPARATOR)[0];
+					d.setObservaciones(fileName);
+				}
+			}
+		}
+		context.setVariable("detalles", detalles);
+		context.setVariable("conApostilla", false);
+		context.setVariable("sinApostilla", true);
+		context.setVariable("fechaSolicitud", Utility.DD_MM_YYYY_HH_MM_AA_LD.format(tramite.getFecha_creacion()));
+
+		return this.templateEngine.process(String.format("../templates/%s.%s", this.templateName, "PDF.html"), context);
 	}
 }

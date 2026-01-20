@@ -26,6 +26,7 @@ import co.gov.sic.bashcopiascertificaciones.entities.Sancion;
 import co.gov.sic.bashcopiascertificaciones.enums.EstadoTramite;
 import co.gov.sic.bashcopiascertificaciones.enums.TipoSancion;
 import co.gov.sic.bashcopiascertificaciones.utils.Constantes;
+import co.gov.sic.bashcopiascertificaciones.utils.Functions;
 import co.gov.sic.bashcopiascertificaciones.utils.GetLogger;
 import co.gov.sic.bashcopiascertificaciones.utils.MailService;
 import co.gov.sic.bashcopiascertificaciones.utils.PDFGeneratorService;
@@ -37,7 +38,10 @@ import co.gov.sic.copiasycertificaciones.ws.client.soap.WSSignClient;
 import sic.ws.interop.api.InteropWSClient;
 import sic.ws.interop.entities.Perfil;
 import sic.ws.interop.entities.Persona;
+import sic.ws.interop.entities.Tramite;
 import sic.ws.interop.entities.radicacion.Radicacion;
+import sic.ws.interop.entities.request.RequestTramite;
+import sic.ws.interop.entities.response.ResponseTramite;
 import sic.ws.interop.entities.response.radicacion.ResponseRadicacion;
 
 /**
@@ -145,20 +149,17 @@ public class ProcessManagerCertificados {
 												tramite.getIdtiposolicitud());
 										List<String> adjuntos = new LinkedList<>();
 										adjuntos.add(fullPath.toString());
-										MailService.Send(radi, tramite.getIdtiposolicitud().getDescripcion(),
-												htmlEmail, adjuntos);
+										MailService.Send(radi, tramite.getIdtiposolicitud().getDescripcion(), htmlEmail,
+												adjuntos);
 
 										// Log del trámite procesado
 										String correosEnviados = radicador.getEmails().stream()
-												.map(e -> e.getDescripcion())
-												.reduce((a, b) -> a + ", " + b)
+												.map(e -> e.getDescripcion()).reduce((a, b) -> a + ", " + b)
 												.orElse("Sin email");
-										logTramites.info(String.format(
-												"IdTramite: %s | Radicación: %s-%s | Correos: %s",
-												tramite.getIdtramite(),
-												tramite.getAno_radi(),
-												tramite.getNume_radi(),
-												correosEnviados));
+										logTramites
+												.info(String.format("IdTramite: %s | Radicación: %s-%s | Correos: %s",
+														tramite.getIdtramite(), tramite.getAno_radi(),
+														tramite.getNume_radi(), correosEnviados));
 									}
 								}
 							}
@@ -216,6 +217,94 @@ public class ProcessManagerCertificados {
 		}
 
 		return null;
+	}
+
+	public void pending2() throws Exception {
+	    TemplateContent templateContent = new TemplateContent("RadicacionCDIS");
+	    List<Cesl_tramite> tramites = DataBaseConnectionCertificados.getInstance().getRequestPending2();
+	    if (tramites.size() > 0) {
+	        Perfil perfilRadicacion = DataBaseConnectionCertificados.getInstance().getPerfilCertificado();
+	        tramites.forEach(tramite -> {
+	            log.info("Procesando radicado: " + tramite.getIdtramite());
+	            List<Cesl_detalleSolicitud> detallesTramite = DataBaseConnectionCertificados.getInstance()
+	                    .getDetallesTramite(tramite.getIdtramite());
+	            RequestTramite request = new RequestTramite();
+	            request.setAnio(tramite.getAno_radi());
+	            request.setNumero(tramite.getNume_radi());
+	            request.setExcluirDependencias(false);
+	            try {
+	                ResponseTramite response = wsInteropClient.radicacionConsultar(request);
+	                List<Tramite> responseTramites = response.getExpedientes();
+	                for (Tramite tram : responseTramites) {
+	                    log.info("Procesando tramite: " + tram.getConsecutivo());
+
+	                    Persona radicador = new Persona();
+	                    radicador.setId(tramite.getIden_pers());
+	                    radicador.setRetornarSoloUltimosDatos(true);
+	                    radicador = wsInteropClient.personaConsultar(radicador).getPersona();
+
+	                    Radicacion radiSalida = new Radicacion();
+	                    radiSalida.setAnio(tram.getAnio());
+	                    radiSalida.setNumero(tram.getNumero());
+	                    radiSalida.setControl(tram.getControl());
+	                    perfilRadicacion.setActuacion((short) 440);
+	                    radiSalida.setPerfil(perfilRadicacion);
+	                    radiSalida.setMedioEntrada(Constantes.WS_RADICACION_MEDIO_ENTRADA);
+	                    radiSalida.setIdFuncionario(Constantes.WS_RADICACION_FUNCIONARIO_RADICADOR_ID);
+	                    radiSalida.setRadicador(radicador);
+	                    radiSalida.setTotalFolios(1);
+	                    radiSalida.setIdTasa(Constantes.WS_RADICACION_CONS_TASA);
+	                    radiSalida.setTipoRadicacion(Constantes.TIPO_RADICACION_SALIDA);
+	                    ResponseRadicacion responseRadicacion = wsInteropClient.radicacionRegistrar(radiSalida);
+	                    
+	                    if (responseRadicacion.getCodigo() == 0) {
+	                        radiSalida = responseRadicacion.getRadicacion();
+	                        String contentPDF = templateContent.buildRadicacionPDFTemplate(radiSalida, tramite,
+	                                detallesTramite);
+	                        String subject = String.format("Radicación SIC %s", radiSalida.getShortNumeroRadicacion());
+	                        try (ByteArrayOutputStream fileContent = PDFGeneratorService.createPdf(contentPDF,
+	                                tramite.getIdtiposolicitud().getDescripcion(), subject,
+	                                String.format(Constantes.KEYWORDS_PDF_RADICACION,
+	                                        radiSalida.getFechaRadicacion().getYear()),
+	                                false, Utility.getBarCode(tramite.getIdtramite(), radiSalida.getConsecutivo(),
+	                                        tramite.getIdtiposolicitud()))) {
+	                            String pathRadicadoEntrada = Functions.saveFile(radiSalida, fileContent);
+	                            String fileName = String.format("%s.%s", radiSalida.getFullNumeroRadicacion(),
+	                                    Constantes.PDF_EXTENSION);
+	                            String base64EncodedPdf = Base64.getEncoder().encodeToString(fileContent.toByteArray());
+
+	                            radiSalida.addAdjunto(base64EncodedPdf, fileName, true);
+	                            ResponseRadicacion responseRadicacionAdjuntos = wsInteropClient
+	                                    .radicacionAdjuntosRegistrar(radiSalida);
+
+	                            if (responseRadicacionAdjuntos.getCodigo() == 0) {
+	                                logTramites.info(String.format("IdTramite: %s | Radicación: %s-%s | Estado: OK",
+	                                        tramite.getIdtramite(), tramite.getAno_radi(), tramite.getNume_radi()));
+	                            } else {
+	                                // Log cuando falla el registro de adjuntos
+	                                logTramites.error(String.format("IdTramite: %s | Radicación: %s-%s | Estado: ERROR_ADJUNTOS | Código: %s | Mensaje: %s",
+	                                        tramite.getIdtramite(), tramite.getAno_radi(), tramite.getNume_radi(),
+	                                        responseRadicacionAdjuntos.getCodigo(),
+	                                        responseRadicacionAdjuntos.getMensaje()));
+	                            }
+	                        }
+	                    } else {
+	                        // Log cuando responseRadicacion.getCodigo() != 0
+	                        logTramites.error(String.format("IdTramite: %s | Radicación: %s-%s | Estado: ERROR_RADICACION | Código: %s | Mensaje: %s",
+	                                tramite.getIdtramite(), tramite.getAno_radi(), tramite.getNume_radi(),
+	                                responseRadicacion.getCodigo(),
+	                                responseRadicacion.getMensaje()));
+	                    }
+	                }
+	            } catch (Exception e) {
+	                // Log cuando hay excepción
+	                logTramites.error(String.format("IdTramite: %s | Radicación: %s-%s | Estado: EXCEPCION | Error: %s",
+	                        tramite.getIdtramite(), tramite.getAno_radi(), tramite.getNume_radi(),
+	                        e.getMessage()));
+	                e.printStackTrace();
+	            }
+	        });
+	    }
 	}
 
 }

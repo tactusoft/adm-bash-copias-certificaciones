@@ -24,8 +24,11 @@ import co.gov.sic.bashcopiascertificaciones.entities.Cesl_detalleSolicitud;
 import co.gov.sic.bashcopiascertificaciones.entities.Cesl_tramite;
 import co.gov.sic.bashcopiascertificaciones.entities.Sancion;
 import co.gov.sic.bashcopiascertificaciones.enums.TipoSancion;
+import co.gov.sic.bashcopiascertificaciones.enums.TipoTramite;
 import co.gov.sic.bashcopiascertificaciones.utils.GetLogger;
+import co.gov.sic.bashcopiascertificaciones.utils.Utility;
 import sic.ws.interop.entities.Perfil;
+import sic.ws.interop.entities.Referencia;
 
 /**
  *
@@ -40,7 +43,13 @@ public class DataBaseConnectionCertificados {
 
 	private static final String SQL_REQUEST_PENDING = "SELECT idtramite, idtiposolicitud, ano_radi, nume_radi, cont_radi, cons_radi, estado, valor_total, "
 			+ "fecha_creacion, fecha_modificacion, medio_respuesta, iden_pers, ano_recibo, num_recibo, func_asignado "
-			+ "FROM cesl_tramite WHERE idtiposolicitud = 1 AND (estado = 6 or estado = 9) AND idtramite in (20667,20668)"
+			+ "FROM cesl_tramite WHERE idtiposolicitud = 1 AND (estado = 6 or estado = 9) and idtramite in (24478)"
+			+ "ORDER BY fecha_creacion";
+
+	private static final String SQL_REQUEST_PENDING_2 = "SELECT idtramite, idtiposolicitud, ano_radi, nume_radi, cont_radi, cons_radi, estado, valor_total, "
+			+ "fecha_creacion, fecha_modificacion, medio_respuesta, iden_pers, ano_recibo, num_recibo, func_asignado "
+			+ "FROM cesl_tramite WHERE idtiposolicitud = 1 AND "
+			+ "idtramite IN (10416) "
 			+ "ORDER BY fecha_creacion";
 
 	private static final String SQL_REQUEST_DETAIL = "select idtramite, tipo_docu, nume_docu, cantidad, anos, tipo_certifica "
@@ -125,8 +134,10 @@ public class DataBaseConnectionCertificados {
 			+ " ) AND a2.fech_acto BETWEEN ? AND ? group by r.ano_radi, r.nume_Radi";
 
 	private static final String SQL_PERFIL_TRAMITE = "SELECT codi_depe, codi_tram, codi_even, codi_actu FROM cesl_tiposolicitud WHERE idtiposolicitud = 7";
-	
+
 	private static final String SQL_UPDATE_TRAMITE = "UPDATE cesl_tramite SET ano_radi = ?, nume_radi = ?, cons_radi = ?, cont_radi = ?, estado = ?, fecha_modificacion = CURRENT year to second, ano_recibo = ?, num_recibo = ? WHERE idtramite = ?";
+
+	private static final String SQL_SELECT_DETALLE_TRAMITE = "SELECT p.idtiposolicitud, iddetallesolicitud, tipo_certifica, tipo_docu, nume_docu, cantidad, anos, valor, idcamaracomercio, observaciones, variable_adicional_2, variable_adicional_1, fecha_adicional_1, opciones_entrega, copia_autenticada, observaciones_radicado, hash_pdf, cons_dire, cons_email, ruta_memo FROM cesl_detallesolicitud c INNER JOIN cesl_tramite p on p.idtramite = c.idtramite WHERE c.idtramite = ?";
 
 	private DataBaseConnectionCertificados() {
 		dbCfg = DataBaseConfig.getInstance();
@@ -198,6 +209,37 @@ public class DataBaseConnectionCertificados {
 
 	}
 
+	public List<Cesl_tramite> getRequestPending2() {
+		List<Cesl_tramite> response = new ArrayList<>();
+		try {
+			PreparedStatement stmt = dbConnection.prepareStatement(SQL_REQUEST_PENDING_2);
+			ResultSet rs = stmt.executeQuery();
+			while (rs.next()) {
+				Cesl_tramite tramite = new Cesl_tramite();
+				tramite.setIdtramite(rs.getInt("idtramite"));
+				tramite.setAno_radi(rs.getShort("ano_radi"));
+				tramite.setNume_radi(rs.getInt("nume_radi"));
+				tramite.setFunc_asignado(rs.getLong("func_asignado"));
+				tramite.setIden_pers(rs.getLong("iden_pers"));
+				Timestamp fechaModi = rs.getTimestamp("fecha_modificacion");
+				if (fechaModi != null) {
+					tramite.setFecha_modificacion(fechaModi.toLocalDateTime());
+				}
+				Timestamp fechaCreacion = rs.getTimestamp("fecha_creacion");
+				if (fechaCreacion != null) {
+					tramite.setFecha_creacion(fechaCreacion.toLocalDateTime());
+				}
+				tramite.setIdtiposolicitud(rs.getInt("idtiposolicitud"));
+				response.add(tramite);
+			}
+
+		} catch (SQLException e) {
+			log.error(e.toString());
+		}
+		return response;
+
+	}
+
 	public Cesl_detalleSolicitud getRequestDetail(Integer idtramite) {
 		try {
 			PreparedStatement stmt = dbConnection.prepareStatement(SQL_REQUEST_DETAIL);
@@ -208,6 +250,9 @@ public class DataBaseConnectionCertificados {
 				detalle.setIdtramite(rs.getInt("idtramite"));
 				detalle.setTipo_docu(rs.getString("tipo_docu"));
 				detalle.setNume_docu(rs.getLong("nume_docu"));
+				if (detalle.getNume_docu() != null) {
+					detalle.setNume_docu_descripcion(Utility.tryFormatCurrencyNumber(detalle.getNume_docu(), false));
+				}
 				detalle.setCantidad(rs.getInt("cantidad"));
 				detalle.setAnos(rs.getInt("anos"));
 				if (detalle.getAnos() != null) {
@@ -385,7 +430,7 @@ public class DataBaseConnectionCertificados {
 		}
 		return result;
 	}
-	
+
 	public void actualizarTramite(Cesl_tramite tram) throws Exception {
 		try (PreparedStatement stmt = dbConnection.prepareStatement(SQL_UPDATE_TRAMITE)) {
 			stmt.setInt(1, tram.getAno_radi());
@@ -406,6 +451,68 @@ public class DataBaseConnectionCertificados {
 			stmt.setInt(8, tram.getIdtramite());
 			stmt.executeUpdate();
 		}
+	}
+
+	public List<Cesl_detalleSolicitud> getDetallesTramite(int idTramite) {
+		List<Cesl_detalleSolicitud> detalles = new ArrayList<>();
+		try {
+			List<Referencia> tiposCertificadoSanciones = Utility.GetReferenciaWS("TIPOCERT_SEDELECTRO");
+			List<Referencia> tiposSolicitudesCopias = Utility.GetReferenciaWS("TIPOSOL_SEDELECTRO");
+			List<Referencia> tiposListadoInfo = Utility.GetReferenciaWS("TIPOSTEM_SEDELECTRO");
+			try (PreparedStatement pr = dbConnection.prepareStatement(SQL_SELECT_DETALLE_TRAMITE)) {
+				pr.setInt(1, idTramite);
+				try (ResultSet rs = pr.executeQuery()) {
+					while (rs.next()) {
+						Cesl_detalleSolicitud detalle = new Cesl_detalleSolicitud();
+						detalle.setIdtramite(idTramite);
+						detalle.setIddetallesolicitud(rs.getInt("iddetallesolicitud"));
+						detalle.setTipo_certifica(rs.getString("tipo_certifica"));
+						detalle.setTipo_docu(rs.getString("tipo_docu"));
+						detalle.setNume_docu(rs.getLong("nume_docu"));
+						detalle.setCantidad(rs.getInt("cantidad"));
+						detalle.setAnos(rs.getInt("anos"));
+						detalle.setValor(rs.getDouble("valor"));
+						detalle.setIdcamaracomercio(rs.getInt("idcamaracomercio"));
+						detalle.setObservaciones(rs.getString("observaciones"));
+						detalle.setVariableAdicional1(rs.getString("variable_adicional_1"));
+						detalle.setVariableAdicional2(rs.getString("variable_adicional_2"));
+						detalle.setFechaAdicional1(rs.getDate("fecha_adicional_1"));
+
+						Integer idtiposolicitud = rs.getInt("idtiposolicitud");
+
+						if (detalle.getAnos() != null) {
+							detalle.setAnos_descripcion(detalle.getAnos() == 1 ? "Último año"
+									: String.format("Últimos %s años", detalle.getAnos()));
+						}
+						if (detalle.getNume_docu() != null) {
+							detalle.setNume_docu_descripcion(
+									Utility.tryFormatCurrencyNumber(detalle.getNume_docu(), false));
+						}
+						List<Referencia> target = null;
+						if (idtiposolicitud == TipoTramite.CERTIFICADO_SANCIONES.getValue()) {
+							target = tiposCertificadoSanciones;
+						} else if (idtiposolicitud == TipoTramite.COPIAS_SIMPLES.getValue()) {
+							target = tiposSolicitudesCopias;
+						} else if (idtiposolicitud == TipoTramite.LISTADOS_INFORMACION.getValue()) {
+							target = tiposListadoInfo;
+						}
+
+						if (target != null && target.size() > 0 && detalle.getTipo_certifica() != null) {
+							for (Referencia referencia : target) {
+								if (referencia.getCodigo().equals(detalle.getTipo_certifica())) {
+									detalle.setTipo_certifica_descripcion(referencia.getValor());
+									break;
+								}
+							}
+						}
+						detalles.add(detalle);
+					}
+				}
+			}
+		} catch (Exception ex) {
+			log.error(ex.toString());
+		}
+		return detalles;
 	}
 
 }
